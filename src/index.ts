@@ -3,4 +3,4 @@ export {
   defineRules,
   can,
 } from "./abac.ts";
-export type { Subject, Resource, Action, Condition, Rule } from "./abac.ts";
+export type { Subject, Resource, Action, Condition, Rule, Decision } from "./abac.ts";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { can, defineRules, type Resource, type Subject } from "./abac.ts";
+import { can, defineRules, RuleSet, type Resource, type Subject } from "./abac.ts";
 
 describe("can", () => {
   it("allows the owner to read their own document", () => {
@@ -37,5 +37,38 @@ describe("defineRules (attribute-based rules)", () => {
 
     expect(rules.can(user, "approve", doc)).toBe(true);
     expect(rules.can(user, "approve", { ...doc, status: "published" })).toBe(false);
+  });
+});
+describe("explain", () => {
+  it("reports a denial with a reason when no rule matches", () => {
+    const rules = new RuleSet([
+      { action: "approve", condition: () => false },
+    ]);
+    const decision = rules.explain({ id: "u1" }, "read", { id: "d1" });
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("no matching rule");
+  });
+});
+
+describe("explain (matched rule)", () => {
+  it("reports the name of the rule that granted access", () => {
+    const rules = new RuleSet([
+      { action: "read", name: "owner-can-read", condition: (_u, r) => r.ownerId === _u.id },
+    ]);
+    const decision = rules.explain({ id: "u1" }, "read", { id: "d1", ownerId: "u1" });
+
+    expect(decision.allowed).toBe(true);
+    expect(decision.reason).toBe("matched rule: owner-can-read");
+  });
+});
+
+describe("explain (admin bypass)", () => {
+  it("explains that access was granted by the admin role", () => {
+    const rules = new RuleSet([]);
+    const decision = rules.explain({ id: "u9", role: "admin" }, "delete", { id: "d1" });
+
+    expect(decision.allowed).toBe(true);
+    expect(decision.reason).toBe("admin role bypass");
   });
 });

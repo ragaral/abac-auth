@@ -15,17 +15,33 @@ export type Condition = (user: Subject, resource: Resource) => boolean;
 
 export interface Rule {
   action: Action;
+  name?: string;
   condition: Condition;
+}
+
+export interface Decision {
+  allowed: boolean;
+  reason: string;
 }
 
 export class RuleSet {
   constructor(private readonly rules: Rule[]) {}
 
-  can(user: Subject, action: Action, resource: Resource): boolean {
-    if (user.role === "admin") return true;
-    return this.rules.some(
+  private evaluate(user: Subject, action: Action, resource: Resource): Decision {
+    if (user.role === "admin") return { allowed: true, reason: "admin role bypass" };
+    const matched = this.rules.find(
       (rule) => rule.action === action && rule.condition(user, resource)
     );
+    if (!matched) return { allowed: false, reason: "no matching rule" };
+    return { allowed: true, reason: `matched rule: ${matched.name ?? "(unnamed)"}` };
+  }
+
+  can(user: Subject, action: Action, resource: Resource): boolean {
+    return this.evaluate(user, action, resource).allowed;
+  }
+
+  explain(user: Subject, action: Action, resource: Resource): Decision {
+    return this.evaluate(user, action, resource);
   }
 }
 
