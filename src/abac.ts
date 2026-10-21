@@ -16,6 +16,7 @@ export type Condition = (user: Subject, resource: Resource) => boolean;
 export interface Rule {
   action: Action;
   name?: string;
+  effect?: "allow" | "deny";
   condition: Condition;
 }
 
@@ -27,11 +28,17 @@ export interface Decision {
 export class RuleSet {
   constructor(private readonly rules: Rule[]) {}
 
+  private matches(rule: Rule, user: Subject, action: Action, resource: Resource): boolean {
+    return rule.action === action && rule.condition(user, resource);
+  }
+
   private evaluate(user: Subject, action: Action, resource: Resource): Decision {
     if (user.role === "admin") return { allowed: true, reason: "admin role bypass" };
-    const matched = this.rules.find(
-      (rule) => rule.action === action && rule.condition(user, resource)
+    const denied = this.rules.find(
+      (rule) => rule.effect === "deny" && this.matches(rule, user, action, resource)
     );
+    if (denied) return { allowed: false, reason: `denied by rule: ${denied.name ?? "(unnamed)"}` };
+    const matched = this.rules.find((rule) => this.matches(rule, user, action, resource));
     if (!matched) return { allowed: false, reason: "no matching rule" };
     return { allowed: true, reason: `matched rule: ${matched.name ?? "(unnamed)"}` };
   }

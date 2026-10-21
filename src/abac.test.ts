@@ -72,3 +72,28 @@ describe("explain (admin bypass)", () => {
     expect(decision.reason).toBe("admin role bypass");
   });
 });
+
+describe("deny rules (deny-overrides)", () => {
+  it("denies when a matching deny rule wins over an allow rule", () => {
+    const rules = new RuleSet([
+      { action: "read", name: "owner-can-read", condition: (_u, r) => r.ownerId === _u.id },
+      { action: "read", name: "banned-doc", effect: "deny", condition: (_u, r) => r.banned === true },
+    ]);
+    const user = { id: "u1" };
+    const doc = { id: "d1", ownerId: "u1", banned: true };
+
+    expect(rules.can(user, "read", doc)).toBe(false);
+  });
+});
+
+describe("deny rules (explainability)", () => {
+  it("explains which deny rule blocked the access", () => {
+    const rules = new RuleSet([
+      { action: "read", name: "banned-doc", effect: "deny", condition: () => true },
+    ]);
+    const decision = rules.explain({ id: "u1" }, "read", { id: "d1" });
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("denied by rule: banned-doc");
+  });
+});
