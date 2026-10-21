@@ -97,3 +97,20 @@ describe("deny rules (explainability)", () => {
     expect(decision.reason).toBe("denied by rule: banned-doc");
   });
 });
+
+describe("environment context", () => {
+  it("passes env to conditions and denies when env does not match", () => {
+    const rules = new RuleSet([
+      {
+        action: "export",
+        name: "only-in-office-hours",
+        condition: (_u, _r, env: { hour: number }) => env.hour >= 8 && env.hour < 18,
+      },
+    ]);
+    const user = { id: "u1" };
+    const resource = { id: "d1" };
+
+    expect(rules.can(user, "export", resource, { hour: 10 })).toBe(true);
+    expect(rules.can(user, "export", resource, { hour: 23 })).toBe(false);
+  });
+});

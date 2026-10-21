@@ -11,7 +11,9 @@ export interface Resource {
 
 export type Action = string;
 
-export type Condition = (user: Subject, resource: Resource) => boolean;
+export type Env = Record<string, unknown>;
+
+export type Condition = (user: Subject, resource: Resource, env: Env) => boolean;
 
 export interface Rule {
   action: Action;
@@ -28,27 +30,27 @@ export interface Decision {
 export class RuleSet {
   constructor(private readonly rules: Rule[]) {}
 
-  private matches(rule: Rule, user: Subject, action: Action, resource: Resource): boolean {
-    return rule.action === action && rule.condition(user, resource);
+  private matches(rule: Rule, user: Subject, action: Action, resource: Resource, env: Env): boolean {
+    return rule.action === action && rule.condition(user, resource, env);
   }
 
-  private evaluate(user: Subject, action: Action, resource: Resource): Decision {
+  private evaluate(user: Subject, action: Action, resource: Resource, env: Env): Decision {
     if (user.role === "admin") return { allowed: true, reason: "admin role bypass" };
     const denied = this.rules.find(
-      (rule) => rule.effect === "deny" && this.matches(rule, user, action, resource)
+      (rule) => rule.effect === "deny" && this.matches(rule, user, action, resource, env)
     );
     if (denied) return { allowed: false, reason: `denied by rule: ${denied.name ?? "(unnamed)"}` };
-    const matched = this.rules.find((rule) => this.matches(rule, user, action, resource));
+    const matched = this.rules.find((rule) => this.matches(rule, user, action, resource, env));
     if (!matched) return { allowed: false, reason: "no matching rule" };
     return { allowed: true, reason: `matched rule: ${matched.name ?? "(unnamed)"}` };
   }
 
-  can(user: Subject, action: Action, resource: Resource): boolean {
-    return this.evaluate(user, action, resource).allowed;
+  can(user: Subject, action: Action, resource: Resource, env: Env = {}): boolean {
+    return this.evaluate(user, action, resource, env).allowed;
   }
 
-  explain(user: Subject, action: Action, resource: Resource): Decision {
-    return this.evaluate(user, action, resource);
+  explain(user: Subject, action: Action, resource: Resource, env: Env = {}): Decision {
+    return this.evaluate(user, action, resource, env);
   }
 }
 
