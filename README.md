@@ -87,7 +87,6 @@ rules.explain(user, "doc:edit", doc);
 // → { allowed: true,  reason: "matched rule: owner-manages-docs" }
 // → { allowed: false, reason: "denied by rule: no-publish-banned" }
 // → { allowed: false, reason: "no matching rule" }
-// → { allowed: true,  reason: "admin role bypass" }   (role: "admin")
 ```
 
 `can()` és simplement `explain().allowed` — una sola font de veritat.
@@ -107,6 +106,51 @@ const rules = defineRules<User, Doc>([
 ```
 
 També pots tipar l'**entorn** (`TEnv`) com a tercer paràmetre genèric: `defineRules<User, Doc, Ctx>`. Si les teves condicions depenen de props d'env obligatòries, passa sempre l'env a la crida — si l'ometes, la llibreria en passa un buit (comportament: les props falten → `undefined`).
+
+## Recursos múltiples
+
+Un `RuleSet` és homogeni en els seus paràmetres de tipus, però això **no et limita**: les condicions reben sempre el mateix valor de recurs, així que totes les regles han de parlar del mateix tipus. Hi ha dos patrons per treballar amb varis tipus de recurs:
+
+### Patró 1: tipus unió — un sol guard per a molts tipus
+
+Els paràmetres genèrics poden ser unions. Les regles sobre camps compartits no necessiten narrowing; les específiques, sí:
+
+```ts
+const mixed = defineRules<User, Doc | Invoice>([
+  { action: "*", condition: (u, r) => r.ownerId === u.id },  // camp compartit: directa
+  { action: "read", effect: "deny",
+    condition: (_u, r) => r.kind === "doc" && r.secret },     // narrowing per Doc
+  { action: "read", effect: "deny",
+    condition: (_u, r) => r.kind === "invoice" && r.amount > 1000 }, // narrowing per Invoice
+]);
+
+mixed.can(user, "read", doc);     // ✓ tipat
+mixed.can(user, "read", invoice); // ✓ tipat
+```
+
+### Patró 2: regles comunes reutilitzades entre sets
+
+Les regles definides sobre un tipus **base** són assignables a qualsevol set amb tipus més **estret** (contravariància de les condicions):
+
+```ts
+type Base = { ownerId: string };
+
+const commonRules: Rule<User, Base>[] = [
+  { action: "*", condition: (u, r) => r.ownerId === u.id },
+];
+
+const docRules = new RuleSet<User, Doc>([
+  ...commonRules,
+  { action: "doc:edit", condition: (_u, r) => !r.secret },
+]);
+
+const invRules = new RuleSet<User, Invoice>([
+  ...commonRules,
+  { action: "invoice:pay", condition: (_u, r) => r.amount < 5000 },
+]);
+```
+
+> **Nota**: cada regla no pot tenir tipus totalment independents dins d'un mateix set — la crida `can(user, action, resource)` passa **un** recurs, així que totes les condicions han de ser compatibles amb aquell valor. Si necessites dispatch per tipus de subjecte (estil CASL), ho has de modelar amb unions o sets separats.
 
 ## API completa
 
