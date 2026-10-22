@@ -1,24 +1,14 @@
-export interface Subject {
-  id: string;
-  [attribute: string]: unknown;
-}
-
-export interface Resource {
-  ownerId?: string;
-  [attribute: string]: unknown;
-}
-
 export type Action = string;
 
 export type Env = Record<string, unknown>;
 
-export type Condition = (user: Subject, resource: Resource, env: Env) => boolean;
+export type Condition<TUser, TResource> = (user: TUser, resource: TResource, env: Env) => boolean;
 
-export interface Rule {
+export interface Rule<TUser = unknown, TResource = unknown> {
   action: Action;
   name?: string;
   effect?: "allow" | "deny";
-  condition: Condition;
+  condition: Condition<TUser, TResource>;
 }
 
 export interface Decision {
@@ -26,10 +16,10 @@ export interface Decision {
   reason: string;
 }
 
-export class RuleSet {
-  constructor(private readonly rules: Rule[]) {}
+export class RuleSet<TUser = unknown, TResource = unknown> {
+  constructor(private readonly rules: Rule<TUser, TResource>[]) {}
 
-  private matches(rule: Rule, user: Subject, action: Action, resource: Resource, env: Env): boolean {
+  private matches(rule: Rule<TUser, TResource>, user: TUser, action: Action, resource: TResource, env: Env): boolean {
     const actionMatches =
       rule.action === "*" ||
       rule.action === action ||
@@ -37,7 +27,7 @@ export class RuleSet {
     return actionMatches && rule.condition(user, resource, env);
   }
 
-  private evaluate(user: Subject, action: Action, resource: Resource, env: Env): Decision {
+  private evaluate(user: TUser, action: Action, resource: TResource, env: Env): Decision {
     const denied = this.rules.find(
       (rule) => rule.effect === "deny" && this.matches(rule, user, action, resource, env)
     );
@@ -47,20 +37,15 @@ export class RuleSet {
     return { allowed: true, reason: `matched rule: ${matched.name ?? "(unnamed)"}` };
   }
 
-  can(user: Subject, action: Action, resource: Resource, env: Env = {}): boolean {
+  can(user: TUser, action: Action, resource: TResource, env: Env = {}): boolean {
     return this.evaluate(user, action, resource, env).allowed;
   }
 
-  explain(user: Subject, action: Action, resource: Resource, env: Env = {}): Decision {
+  explain(user: TUser, action: Action, resource: TResource, env: Env = {}): Decision {
     return this.evaluate(user, action, resource, env);
   }
 }
 
-export const defineRules = (rules: Rule[]): RuleSet => new RuleSet(rules);
-
-const defaultRules = new RuleSet([
-  { action: "read", condition: (user, resource) => resource.ownerId === user.id },
-]);
-
-export const can = (user: Subject, action: Action, resource: Resource): boolean =>
-  defaultRules.can(user, action, resource);
+export const defineRules = <TUser, TResource>(
+  rules: Rule<TUser, TResource>[]
+): RuleSet<TUser, TResource> => new RuleSet(rules);

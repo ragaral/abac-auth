@@ -15,7 +15,8 @@
   "scripts": {
     "build": "tsc && sed -i 's/\\.ts\"/\\.js\"/g' dist/*.d.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:types": "vitest --typecheck run"
   },
   "devDependencies": {
     "@types/node": "^28.0.0",

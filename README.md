@@ -89,17 +89,28 @@ rules.explain(user, "doc:edit", doc);
 
 `can()` és simplement `explain().allowed` — una sola font de veritat.
 
+## Tipus definits pel client
+
+El motor és **genèric** i no imposa cap forma: els tipus de `user` i `resource` són teus i flueixen per les condicions amb inferència completa.
+
+```ts
+type User = { userId: string; dept: string };
+type Doc = { docId: string; dept: string; secret: boolean };
+
+const rules = defineRules<User, Doc>([
+  { action: "read", name: "same-dept", condition: (user, doc) => user.dept === doc.dept },
+  //                                          ^ User?  ^ Doc — tipats automàticament
+]);
+```
+
 ## API completa
 
 ```ts
-import { defineRules, RuleSet, can } from "abac-auth";
+import { defineRules, RuleSet } from "abac-auth";
 
-const rules = defineRules([{ ... }]);      // sugar per a new RuleSet([...])
-rules.can(user, action, resource, env?)    // → boolean
-rules.explain(user, action, resource, env?) // → { allowed, reason }
-
-can(user, "read", resource)                // helper standalone amb regles per defecte
-                                           // (owner pot llegir recursos propis)
+const rules = defineRules<User, Doc>([{ ... }]);   // sugar per a new RuleSet<User, Doc>([...])
+rules.can(user, action, resource, env?)            // → boolean
+rules.explain(user, action, resource, env?)        // → { allowed, reason }
 ```
 
 ## Desenvolupament
@@ -109,6 +120,7 @@ Metodologia **Red-Green-Refactor** estricta: un test nou → veure'l fallar → 
 ```bash
 npm test             # executar tests
 npm run test:watch   # mode watch
+npm run test:types   # type tests (expectTypeOf)
 npm run build        # compilar a dist/ (amb correcció d'extensions als .d.ts)
 ```
 
