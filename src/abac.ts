@@ -31,7 +31,11 @@ export class RuleSet {
   constructor(private readonly rules: Rule[]) {}
 
   private matches(rule: Rule, user: Subject, action: Action, resource: Resource, env: Env): boolean {
-    return rule.action === action && rule.condition(user, resource, env);
+    const actionMatches =
+      rule.action === "*" ||
+      rule.action === action ||
+      (rule.action.endsWith(":*") && action.startsWith(rule.action.slice(0, -1)));
+    return actionMatches && rule.condition(user, resource, env);
   }
 
   private evaluate(user: Subject, action: Action, resource: Resource, env: Env): Decision {

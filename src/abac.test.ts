@@ -114,3 +114,30 @@ describe("environment context", () => {
     expect(rules.can(user, "export", resource, { hour: 23 })).toBe(false);
   });
 });
+
+describe("action wildcards", () => {
+  it("matches any action with the global * wildcard", () => {
+    const rules = new RuleSet([
+      { action: "*", name: "owner-full-control", condition: (_u, r) => r.ownerId === _u.id },
+    ]);
+    const owner = { id: "u1" };
+    const doc = { id: "d1", ownerId: "u1" };
+
+    expect(rules.can(owner, "read", doc)).toBe(true);
+    expect(rules.can(owner, "delete", doc)).toBe(true);
+  });
+});
+
+describe("action wildcards (prefix)", () => {
+  it("matches namespaced actions with a prefix wildcard", () => {
+    const rules = new RuleSet([
+      { action: "doc:*", name: "owner-manages-docs", condition: (_u, r) => r.ownerId === _u.id },
+    ]);
+    const owner = { id: "u1" };
+    const doc = { id: "d1", ownerId: "u1" };
+
+    expect(rules.can(owner, "doc:edit", doc)).toBe(true);
+    expect(rules.can(owner, "doc:share", doc)).toBe(true);
+    expect(rules.can(owner, "user:delete", doc)).toBe(false); // altre namespace
+  });
+});
