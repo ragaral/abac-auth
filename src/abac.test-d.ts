@@ -19,3 +19,16 @@ describe("client-defined types", () => {
     expectTypeOf(rules.explain).parameter(2).toEqualTypeOf<Doc>();
   });
 });
+
+type Ctx = { hour: number };
+
+const ctxRules = defineRules<User, Doc, Ctx>([
+  { action: "export", name: "office-hours", condition: (user, doc, env) => env.hour >= 8 },
+]);
+
+describe("client-defined env types", () => {
+  it("infers env type on can() and explain()", () => {
+    expectTypeOf(ctxRules.can).parameter(3).toEqualTypeOf<Ctx | undefined>();
+    expectTypeOf(ctxRules.explain).parameter(3).toEqualTypeOf<Ctx | undefined>();
+  });
+});

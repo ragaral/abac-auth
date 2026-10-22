@@ -30,16 +30,19 @@ rules.can(user, "doc:edit", doc); // → true
 
 ## Els 3 pilars ABAC
 
-Tota condició rep els tres pilars: **subjecte** (usuari), **recurs** i **entorn**.
+Tota condició rep els tres pilars: **subjecte** (usuari), **recurs** i **entorn**. Els tres són **genèrics**: els tipus els defineixes tu i flueixen per tot el sistema.
 
 ```ts
-{
-  action: "export",
-  name: "only-in-office-hours",
-  condition: (user, resource, env) => env.hour >= 8 && env.hour < 18,
-}
+const rules = defineRules<User, Doc, Ctx>([
+  {
+    action: "export",
+    name: "only-in-office-hours",
+    condition: (user, resource, env) => env.hour >= 8 && env.hour < 18,
+    //                                ^ Ctx — tipat, sense anotacions repetides
+  },
+]);
 
-rules.can(user, "export", doc, { hour: 10 }); // env és opcional (default: {})
+rules.can(user, "export", doc, { hour: 10 }); // env opcional (default: {})
 ```
 
 ## Regles
@@ -102,6 +105,8 @@ const rules = defineRules<User, Doc>([
   //                                          ^ User?  ^ Doc — tipats automàticament
 ]);
 ```
+
+També pots tipar l'**entorn** (`TEnv`) com a tercer paràmetre genèric: `defineRules<User, Doc, Ctx>`. Si les teves condicions depenen de props d'env obligatòries, passa sempre l'env a la crida — si l'ometes, la llibreria en passa un buit (comportament: les props falten → `undefined`).
 
 ## API completa
 
