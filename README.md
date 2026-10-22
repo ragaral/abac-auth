@@ -174,6 +174,8 @@ rules.can(user, "doc:read", doc); // true: la regla d'edit cobreix read
 
 L'`explain()` ho fa visible: `"matched rule: editor (doc:edit implies doc:read)"`.
 
+**Cicles**: si declares un cicle (`a → b → a`), no és un error — significa que `a` i `b` són permisos equivalents. La clòsure es calcula per iteració al punt fix (terminació garantida, independent de l'ordre de declaració), i el resultat és correcte també quan hi ha nodes externs que apunten dins el cicle.
+
 ## API completa
 
 ```ts

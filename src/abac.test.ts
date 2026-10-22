@@ -227,3 +227,22 @@ describe("action hierarchy (explainability)", () => {
     expect(decision.reason).toBe("matched rule: editor (doc:edit implies doc:read)");
   });
 });
+
+describe("action hierarchy (cycles)", () => {
+  it("computes correct closure even when the hierarchy contains cycles", () => {
+    // d → c → a → b → a: d implica b passant pel cicle
+    const rules = new RuleSet(
+      [{ action: "doc:d", condition: () => true }],
+      {
+        hierarchy: {
+          "doc:a": ["doc:b"],
+          "doc:b": ["doc:c"],
+          "doc:c": ["doc:a"],
+          "doc:d": ["doc:c"],
+        },
+      }
+    );
+
+    expect(rules.can({ id: "u1" }, "doc:b", { id: "d1" })).toBe(true);
+  });
+});

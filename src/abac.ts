@@ -98,19 +98,25 @@ export const defineRules = <TUser, TResource, TEnv extends Env = Env>(
 
 function computeImpliedActions(hierarchy: Hierarchy): Map<Action, Set<Action>> {
   const closure = new Map<Action, Set<Action>>();
-  const visit = (action: Action, seen: Set<Action>): Set<Action> => {
-    const cached = closure.get(action);
-    if (cached) return cached;
-    if (seen.has(action)) return new Set(); // cicle: no expandir
-    seen.add(action);
-    const result = new Set<Action>();
-    for (const next of hierarchy[action] ?? []) {
-      result.add(next);
-      for (const transitive of visit(next, seen)) result.add(transitive);
+  for (const [action, implied] of Object.entries(hierarchy)) {
+    closure.set(action, new Set(implied));
+  }
+
+  // Iteració al punt fix: els conjunts només creixen i estan fitats per n²,
+  // per la qual cosa termina. Un cicle a→b→a es tracta com a permisos equivalents.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [action, implied] of closure) {
+      for (const next of [...implied]) {
+        for (const transitive of closure.get(next) ?? []) {
+          if (transitive !== action && !implied.has(transitive)) {
+            implied.add(transitive);
+            changed = true;
+          }
+        }
+      }
     }
-    closure.set(action, result);
-    return result;
-  };
-  for (const action of Object.keys(hierarchy)) visit(action, new Set());
+  }
   return closure;
 }
