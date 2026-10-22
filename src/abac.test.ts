@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import { defineRules, RuleSet } from "./abac.ts";
 
-describe("owner rule (client-defined)", () => {
+describe("rule matching", () => {
   const rules = defineRules([
     {
       action: "read",
@@ -23,17 +23,8 @@ describe("owner rule (client-defined)", () => {
     expect(rules.can(user, "read", doc)).toBe(false);
   });
 
-  it("denies actions with no default rule, even for admins — role is client-defined", () => {
-    const admin = { id: "u9", role: "admin" };
-    const doc = { id: "d1", ownerId: "u1", type: "document" };
-
-    expect(rules.can(admin, "delete", doc)).toBe(false);
-  });
-});
-
-describe("defineRules (attribute-based rules)", () => {
   it("supports custom attribute conditions", () => {
-    const rules = defineRules([
+    const approvalRules = defineRules([
       {
         action: "approve",
         condition: (_user, resource: { status: string }) => resource.status === "draft",
@@ -42,10 +33,18 @@ describe("defineRules (attribute-based rules)", () => {
     const doc = { id: "d1", ownerId: "u1", status: "draft" };
     const user = { id: "u1", role: "editor" };
 
-    expect(rules.can(user, "approve", doc)).toBe(true);
-    expect(rules.can(user, "approve", { ...doc, status: "published" })).toBe(false);
+    expect(approvalRules.can(user, "approve", doc)).toBe(true);
+    expect(approvalRules.can(user, "approve", { ...doc, status: "published" })).toBe(false);
+  });
+
+  it("denies actions with no rule, even for admins — role is client-defined", () => {
+    const admin = { id: "u9", role: "admin" };
+    const doc = { id: "d1", ownerId: "u1", type: "document" };
+
+    expect(rules.can(admin, "delete", doc)).toBe(false);
   });
 });
+
 describe("explain", () => {
   it("reports a denial with a reason when no rule matches", () => {
     const rules = new RuleSet([
@@ -56,9 +55,7 @@ describe("explain", () => {
     expect(decision.allowed).toBe(false);
     expect(decision.reason).toBe("no matching rule");
   });
-});
 
-describe("explain (matched rule)", () => {
   it("reports the name of the rule that granted access", () => {
     const rules = new RuleSet([
       { action: "read", name: "owner-can-read", condition: (_u, r) => r.ownerId === _u.id },
@@ -68,9 +65,7 @@ describe("explain (matched rule)", () => {
     expect(decision.allowed).toBe(true);
     expect(decision.reason).toBe("matched rule: owner-can-read");
   });
-});
 
-describe("explain (client-defined bypass)", () => {
   it("explains a client-defined admin bypass via wildcard rule", () => {
     const rules = new RuleSet([
       { action: "*", name: "admin-bypass", condition: (u) => u.role === "admin" },
@@ -79,6 +74,14 @@ describe("explain (client-defined bypass)", () => {
 
     expect(decision.allowed).toBe(true);
     expect(decision.reason).toBe("matched rule: admin-bypass");
+  });
+
+  it("gives admins no special power unless a rule grants it", () => {
+    const rules = new RuleSet([]);
+    const decision = rules.explain({ id: "u9", role: "admin" }, "delete", { id: "d1" });
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("no matching rule");
   });
 });
 
@@ -93,9 +96,7 @@ describe("deny rules (deny-overrides)", () => {
 
     expect(rules.can(user, "read", doc)).toBe(false);
   });
-});
 
-describe("deny rules (explainability)", () => {
   it("explains which deny rule blocked the access", () => {
     const rules = new RuleSet([
       { action: "read", name: "banned-doc", effect: "deny", condition: () => true },
@@ -135,9 +136,7 @@ describe("action wildcards", () => {
     expect(rules.can(owner, "read", doc)).toBe(true);
     expect(rules.can(owner, "delete", doc)).toBe(true);
   });
-});
 
-describe("action wildcards (prefix)", () => {
   it("matches namespaced actions with a prefix wildcard", () => {
     const rules = new RuleSet([
       { action: "doc:*", name: "owner-manages-docs", condition: (_u, r) => r.ownerId === _u.id },
@@ -151,25 +150,17 @@ describe("action wildcards (prefix)", () => {
   });
 });
 
-describe("role is client-defined", () => {
-  it("gives admins no special power unless a rule grants it", () => {
-    const rules = new RuleSet([]);
-    const decision = rules.explain({ id: "u9", role: "admin" }, "delete", { id: "d1" });
-
-    expect(decision.allowed).toBe(false);
-    expect(decision.reason).toBe("no matching rule");
-  });
-});
-
 // ─── Type tests (verificats amb `npm run test:types`, no-op a runtime) ───
-
-import { expectTypeOf } from "vitest";
 
 type TUser = { userId: string; dept: string };
 type TDoc = { docId: string; dept: string; secret: boolean };
 
 const typedRules = defineRules<TUser, TDoc>([
   { action: "read", name: "same-dept", condition: (user, doc) => user.dept === doc.dept },
+]);
+
+const ctxRules = defineRules<TUser, TDoc, { hour: number }>([
+  { action: "export", name: "office-hours", condition: (user, doc, env) => env.hour >= 8 },
 ]);
 
 describe("client-defined types (type tests)", () => {
@@ -179,17 +170,9 @@ describe("client-defined types (type tests)", () => {
     expectTypeOf(typedRules.explain).parameter(0).toEqualTypeOf<TUser>();
     expectTypeOf(typedRules.explain).parameter(2).toEqualTypeOf<TDoc>();
   });
-});
 
-type TCtx = { hour: number };
-
-const ctxRules = defineRules<TUser, TDoc, TCtx>([
-  { action: "export", name: "office-hours", condition: (user, doc, env) => env.hour >= 8 },
-]);
-
-describe("client-defined env types (type tests)", () => {
   it("infers env type on can() and explain()", () => {
-    expectTypeOf(ctxRules.can).parameter(3).toEqualTypeOf<TCtx | undefined>();
-    expectTypeOf(ctxRules.explain).parameter(3).toEqualTypeOf<TCtx | undefined>();
+    expectTypeOf(ctxRules.can).parameter(3).toEqualTypeOf<{ hour: number } | undefined>();
+    expectTypeOf(ctxRules.explain).parameter(3).toEqualTypeOf<{ hour: number } | undefined>();
   });
 });
