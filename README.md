@@ -211,5 +211,14 @@ npm run build        # compilar a dist/ (amb correcció d'extensions als .d.ts)
 - [x] Rols definits pel client (cap privilegi built-in al motor)
 - [x] Jerarquia d'accions (clòsure transitiva, deny no hereta)
 - [ ] Helpers d'integració (middleware Hono/Express)
-- [ ] Polítiques serialitzables (JSON)
+
+**Decisions de disseny tancades:**
+
+- **Polítiques serialitzables (JSON/DSL)**: no s'implementarà a la llibreria. Les condicions són funcions — màxima flexibilitat i tipat complet. Un DSL de condicions canviaria el producte i només tindria sentit amb autoria no-dev. Si cal persistir polítiques, el patró del **registre de condicions** ho resol al client sense tocar la llibreria:
+
+  ```ts
+  const registry = { "owner-matches": (u, r) => r.ownerId === u.id };
+  const saved = [{ action: "doc:edit", name: "editor", conditionId: "owner-matches" }];
+  const rules = defineRules(saved.map(r => ({ ...r, condition: registry[r.conditionId] })));
+  ```
 
