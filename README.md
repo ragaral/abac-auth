@@ -152,6 +152,28 @@ const invRules = new RuleSet<User, Invoice>([
 
 > **Nota**: cada regla no pot tenir tipus totalment independents dins d'un mateix set — la crida `can(user, action, resource)` passa **un** recurs, així que totes les condicions han de ser compatibles amb aquell valor. Si necessites dispatch per tipus de subjecte (estil CASL), ho has de modelar amb unions o sets separats.
 
+### Jerarquia d'accions
+
+Si un permís **implica** un altre (editar implica llegir), declara-ho amb l'opció `hierarchy` — la clòsure transitiva es calcula a la construcció:
+
+```ts
+const rules = defineRules([
+  { action: "doc:edit", name: "editor", condition: (u, r) => r.ownerId === u.id },
+], {
+  hierarchy: {
+    "doc:edit": ["doc:read"],
+    "doc:delete": ["doc:read"],
+    "doc:admin": ["doc:edit"],  // transitivament: admin → edit → read
+  },
+});
+
+rules.can(user, "doc:read", doc); // true: la regla d'edit cobreix read
+```
+
+**Semàntica asimètrica (intencionada)**: la jerarquia només s'aplica als **allow** — concedir un permís et concedeix els que implica. Les **deny** no l'hereten: retirar el permís d'editar **no retira** el de llegir. Els wildcards, en canvi, funcionen a banda i banda (són expansió de conjunt, no implicació).
+
+L'`explain()` ho fa visible: `"matched rule: editor (doc:edit implies doc:read)"`.
+
 ## API completa
 
 ```ts
@@ -185,6 +207,7 @@ npm run build        # compilar a dist/ (amb correcció d'extensions als .d.ts)
 - [x] Context d'entorn
 - [x] Wildcards d'acció (`*`, `ns:*`)
 - [x] Rols definits pel client (cap privilegi built-in al motor)
+- [x] Jerarquia d'accions (clòsure transitiva, deny no hereta)
 - [ ] Helpers d'integració (middleware Hono/Express)
 - [ ] Polítiques serialitzables (JSON)
-- [ ] Jerarquia d'accions
+

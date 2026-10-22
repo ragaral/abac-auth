@@ -176,3 +176,54 @@ describe("client-defined types (type tests)", () => {
     expectTypeOf(ctxRules.explain).parameter(3).toEqualTypeOf<{ hour: number } | undefined>();
   });
 });
+
+describe("action hierarchy", () => {
+  it("grants implied actions: a rule for doc:edit covers doc:read", () => {
+    const rules = new RuleSet(
+      [{ action: "doc:edit", name: "editor", condition: (_u, r) => r.ownerId === _u.id }],
+      { hierarchy: { "doc:edit": ["doc:read"] } }
+    );
+    const owner = { id: "u1" };
+    const doc = { id: "d1", ownerId: "u1" };
+
+    expect(rules.can(owner, "doc:read", doc)).toBe(true);
+  });
+});
+
+describe("action hierarchy (transitivity)", () => {
+  it("expands the hierarchy transitively: admin implies edit implies read", () => {
+    const rules = new RuleSet(
+      [{ action: "doc:admin", condition: () => true }],
+      { hierarchy: { "doc:admin": ["doc:edit"], "doc:edit": ["doc:read"] } }
+    );
+
+    expect(rules.can({ id: "u1" }, "doc:read", { id: "d1" })).toBe(true);
+  });
+});
+
+describe("action hierarchy (deny semantics)", () => {
+  it("does not expand deny rules: denying edit does not deny read", () => {
+    const rules = new RuleSet(
+      [
+        { action: "doc:edit", name: "editor", condition: () => true },
+        { action: "doc:edit", name: "no-edit", effect: "deny", condition: () => true },
+      ],
+      { hierarchy: { "doc:edit": ["doc:read"] } }
+    );
+
+    expect(rules.can({ id: "u1" }, "doc:edit", { id: "d1" })).toBe(false); // denegat
+    expect(rules.can({ id: "u1" }, "doc:read", { id: "d1" })).toBe(true);  // read no es veu afectat
+  });
+});
+
+describe("action hierarchy (explainability)", () => {
+  it("mentions the implication in the decision reason", () => {
+    const rules = new RuleSet(
+      [{ action: "doc:edit", name: "editor", condition: () => true }],
+      { hierarchy: { "doc:edit": ["doc:read"] } }
+    );
+    const decision = rules.explain({ id: "u1" }, "doc:read", { id: "d1" });
+
+    expect(decision.reason).toBe("matched rule: editor (doc:edit implies doc:read)");
+  });
+});
