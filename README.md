@@ -186,6 +186,38 @@ rules.can(user, action, resource, env?)            // → boolean
 rules.explain(user, action, resource, env?)        // → { allowed, reason }
 ```
 
+## Integració Hono
+
+Subpath independent del core: `abac-auth/hono`. Hono és una **peer dependency opcional** — els projectes sense Hono no l'instal·len ni l'avisen; els que el fan servir usen la seva pròpia instal·lació.
+
+```ts
+import { Hono } from "hono";
+import { abacGuard } from "abac-auth/hono";
+import { defineRules } from "abac-auth";
+
+const rules = defineRules([
+  { action: "doc:edit", condition: (u, r) => r.ownerId === u.id },
+]);
+
+const app = new Hono();
+app.use("/docs/*", abacGuard({
+  rules,
+  action: "doc:edit",
+  getUser: (c) => ({ id: c.get("userId") }),        // l'autenticació és teva
+  getResource: (c) => docs.get(c.req.param("id")),
+  getEnv: (c) => ({ hour: new Date().getHours() }), // opcional
+}));
+app.get("/docs/:id", (c) => c.json(await getDoc(c.req.param("id"))));
+```
+
+Denegació → **403** amb el motiu de la decisió al body:
+
+```json
+{ "error": "Forbidden", "allowed": false, "reason": "no matching rule" }
+```
+
+> **Monorepo?** De moment no: amb una sola integració petita, el subpath + peer dep opcional és suficient i el codi viu aïllat (`src/hono.ts`). Si n'apareixen més (Express, Fastify) o cal versionar per separat, l'extracció a `packages/` és un `git mv`.
+
 ## Desenvolupament
 
 Metodologia **Red-Green-Refactor** estricta: un test nou → veure'l fallar → implementació mínima → verd → refactor.
@@ -210,7 +242,7 @@ npm run build        # compilar a dist/ (amb correcció d'extensions als .d.ts)
 - [x] Wildcards d'acció (`*`, `ns:*`)
 - [x] Rols definits pel client (cap privilegi built-in al motor)
 - [x] Jerarquia d'accions (clòsure transitiva, deny no hereta)
-- [ ] Helpers d'integració (middleware Hono/Express)
+- [x] Middleware Hono (`abac-auth/hono`, peer dep opcional)
 
 **Decisions de disseny tancades:**
 
