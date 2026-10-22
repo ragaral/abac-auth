@@ -233,18 +233,7 @@ npm run build        # compilar a dist/ (amb correcció d'extensions als .d.ts)
 - **Vitest** per als tests
 - Publicat a: https://github.com/ragaral/abac-auth
 
-## Roadmap
-
-- [x] Regles d'atributs (subjecte, recurs)
-- [x] Deny explícit (deny-overrides)
-- [x] Explicabilitat de decisions
-- [x] Context d'entorn
-- [x] Wildcards d'acció (`*`, `ns:*`)
-- [x] Rols definits pel client (cap privilegi built-in al motor)
-- [x] Jerarquia d'accions (clòsure transitiva, deny no hereta)
-- [x] Middleware Hono (`abac-auth/hono`, peer dep opcional)
-
-**Decisions de disseny tancades:**
+## Decisions de disseny tancades
 
 - **Polítiques serialitzables (JSON/DSL)**: no s'implementarà a la llibreria. Les condicions són funcions — màxima flexibilitat i tipat complet. Un DSL de condicions canviaria el producte i només tindria sentit amb autoria no-dev. Si cal persistir polítiques, el patró del **registre de condicions** ho resol al client sense tocar la llibreria:
 
