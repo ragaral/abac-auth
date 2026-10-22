@@ -63,11 +63,17 @@ interface Rule {
 
 ### Deny-overrides
 
-Si **qualsevol** regla `effect: "deny"` coincideix, l'accés es denega sempre — fins i tot si altres regles allow també coincideixen. La primera deny que coincideix guanya.
+Si **qualsevol** regla `effect: "deny"` coincideix, l'accés es denega sempre — fins i tot si altres regles allow també coincideixen, i fins i tot per a usuaris privilegiats. La primera deny que coincideix guanya. **Sense excepcions**.
 
-### Admin bypass
+### Els rols els defineix el client
 
-Els subjectes amb `role: "admin"` tenen accés total a qualsevol acció, **per damunt de les regles deny**. És el "trencasermells" d'emergència.
+El motor no té cap privilegi especial built-in. Un bypass d'admin és simplement una regla més:
+
+```ts
+{ action: "*", name: "admin-bypass", condition: (user) => user.role === "admin" }
+```
+
+Avantatge: semantics uniformes — `explain()` sempre respon "matched rule: admin-bypass", i una deny explícita pot lligar fins i tot l'admin si així ho vols.
 
 ## Explicabilitat
 
@@ -117,6 +123,7 @@ npm run build        # compilar a dist/ (amb correcció d'extensions als .d.ts)
 - [x] Explicabilitat de decisions
 - [x] Context d'entorn
 - [x] Wildcards d'acció (`*`, `ns:*`)
+- [x] Rols definits pel client (cap privilegi built-in al motor)
 - [ ] Helpers d'integració (middleware Hono/Express)
 - [ ] Polítiques serialitzables (JSON)
 - [ ] Jerarquia d'accions

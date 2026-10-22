@@ -16,11 +16,11 @@ describe("can", () => {
     expect(can(user, "read", doc)).toBe(false);
   });
 
-  it("allows an admin to do anything", () => {
+  it("denies actions with no default rule, even for admins — role is client-defined", () => {
     const admin = { id: "u9", role: "admin" };
     const doc = { id: "d1", ownerId: "u1", type: "document" };
 
-    expect(can(admin, "delete", doc)).toBe(true);
+    expect(can(admin, "delete", doc)).toBe(false);
   });
 });
 
@@ -63,13 +63,15 @@ describe("explain (matched rule)", () => {
   });
 });
 
-describe("explain (admin bypass)", () => {
-  it("explains that access was granted by the admin role", () => {
-    const rules = new RuleSet([]);
+describe("explain (client-defined bypass)", () => {
+  it("explains a client-defined admin bypass via wildcard rule", () => {
+    const rules = new RuleSet([
+      { action: "*", name: "admin-bypass", condition: (u) => u.role === "admin" },
+    ]);
     const decision = rules.explain({ id: "u9", role: "admin" }, "delete", { id: "d1" });
 
     expect(decision.allowed).toBe(true);
-    expect(decision.reason).toBe("admin role bypass");
+    expect(decision.reason).toBe("matched rule: admin-bypass");
   });
 });
 
@@ -139,5 +141,15 @@ describe("action wildcards (prefix)", () => {
     expect(rules.can(owner, "doc:edit", doc)).toBe(true);
     expect(rules.can(owner, "doc:share", doc)).toBe(true);
     expect(rules.can(owner, "user:delete", doc)).toBe(false); // altre namespace
+  });
+});
+
+describe("role is client-defined", () => {
+  it("gives admins no special power unless a rule grants it", () => {
+    const rules = new RuleSet([]);
+    const decision = rules.explain({ id: "u9", role: "admin" }, "delete", { id: "d1" });
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("no matching rule");
   });
 });

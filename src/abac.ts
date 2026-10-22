@@ -1,6 +1,5 @@
 export interface Subject {
   id: string;
-  role?: string;
   [attribute: string]: unknown;
 }
 
@@ -39,7 +38,6 @@ export class RuleSet {
   }
 
   private evaluate(user: Subject, action: Action, resource: Resource, env: Env): Decision {
-    if (user.role === "admin") return { allowed: true, reason: "admin role bypass" };
     const denied = this.rules.find(
       (rule) => rule.effect === "deny" && this.matches(rule, user, action, resource, env)
     );
