@@ -160,3 +160,36 @@ describe("role is client-defined", () => {
     expect(decision.reason).toBe("no matching rule");
   });
 });
+
+// ─── Type tests (verificats amb `npm run test:types`, no-op a runtime) ───
+
+import { expectTypeOf } from "vitest";
+
+type TUser = { userId: string; dept: string };
+type TDoc = { docId: string; dept: string; secret: boolean };
+
+const typedRules = defineRules<TUser, TDoc>([
+  { action: "read", name: "same-dept", condition: (user, doc) => user.dept === doc.dept },
+]);
+
+describe("client-defined types (type tests)", () => {
+  it("infers user and resource types on can() and explain()", () => {
+    expectTypeOf(typedRules.can).parameter(0).toEqualTypeOf<TUser>();
+    expectTypeOf(typedRules.can).parameter(2).toEqualTypeOf<TDoc>();
+    expectTypeOf(typedRules.explain).parameter(0).toEqualTypeOf<TUser>();
+    expectTypeOf(typedRules.explain).parameter(2).toEqualTypeOf<TDoc>();
+  });
+});
+
+type TCtx = { hour: number };
+
+const ctxRules = defineRules<TUser, TDoc, TCtx>([
+  { action: "export", name: "office-hours", condition: (user, doc, env) => env.hour >= 8 },
+]);
+
+describe("client-defined env types (type tests)", () => {
+  it("infers env type on can() and explain()", () => {
+    expectTypeOf(ctxRules.can).parameter(3).toEqualTypeOf<TCtx | undefined>();
+    expectTypeOf(ctxRules.explain).parameter(3).toEqualTypeOf<TCtx | undefined>();
+  });
+});
