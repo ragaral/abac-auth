@@ -26,6 +26,14 @@ export interface RuleSetOptions {
   hierarchy?: Hierarchy;
 }
 
+function basicActionCovers(ruleAction: Action, requested: Action): boolean {
+  return (
+    ruleAction === "*" ||
+    ruleAction === requested ||
+    (ruleAction.endsWith(":*") && requested.startsWith(ruleAction.slice(0, -1)))
+  );
+}
+
 export class RuleSet<TUser = unknown, TResource = unknown, TEnv extends Env = Env> {
   private readonly implied: Map<Action, Set<Action>>;
 
@@ -36,21 +44,17 @@ export class RuleSet<TUser = unknown, TResource = unknown, TEnv extends Env = En
     this.implied = computeImpliedActions(options.hierarchy ?? {});
   }
 
-  private actionCovers(ruleAction: Action, requested: Action): boolean {
-    if (ruleAction === "*") return true;
-    if (ruleAction === requested) return true;
-    if (ruleAction.endsWith(":*") && requested.startsWith(ruleAction.slice(0, -1))) return true;
-    return this.implied.get(ruleAction)?.has(requested) ?? false;
-  }
-
-  private matches(
+  private matchesAllow(
     rule: Rule<TUser, TResource, TEnv>,
     user: TUser,
     action: Action,
     resource: TResource,
     env: TEnv
   ): boolean {
-    return this.actionCovers(rule.action, action) && rule.condition(user, resource, env);
+    const actionCovers =
+      basicActionCovers(rule.action, action) ||
+      (this.implied.get(rule.action)?.has(action) ?? false);
+    return actionCovers && rule.condition(user, resource, env);
   }
 
   /** El deny no hereta la jerarquia: retirar un permís no retira els que implica. */
@@ -61,11 +65,7 @@ export class RuleSet<TUser = unknown, TResource = unknown, TEnv extends Env = En
     resource: TResource,
     env: TEnv
   ): boolean {
-    const basicMatch =
-      rule.action === "*" ||
-      rule.action === action ||
-      (rule.action.endsWith(":*") && action.startsWith(rule.action.slice(0, -1)));
-    return basicMatch && rule.condition(user, resource, env);
+    return basicActionCovers(rule.action, action) && rule.condition(user, resource, env);
   }
 
   private evaluate(user: TUser, action: Action, resource: TResource, env: TEnv): Decision {
@@ -73,12 +73,11 @@ export class RuleSet<TUser = unknown, TResource = unknown, TEnv extends Env = En
       (rule) => rule.effect === "deny" && this.matchesDeny(rule, user, action, resource, env)
     );
     if (denied) return { allowed: false, reason: `denied by rule: ${denied.name ?? "(unnamed)"}` };
-    const matched = this.rules.find((rule) => this.matches(rule, user, action, resource, env));
+    const matched = this.rules.find((rule) => this.matchesAllow(rule, user, action, resource, env));
     if (!matched) return { allowed: false, reason: "no matching rule" };
-    const viaHierarchy =
-      matched.action !== action && (this.implied.get(matched.action)?.has(action) ?? false)
-        ? ` (${matched.action} implies ${action})`
-        : "";
+    const viaHierarchy = basicActionCovers(matched.action, action)
+      ? ""
+      : ` (${matched.action} implies ${action})`;
     return { allowed: true, reason: `matched rule: ${matched.name ?? "(unnamed)"}${viaHierarchy}` };
   }
 
